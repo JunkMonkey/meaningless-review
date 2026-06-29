@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>无意义影评生成器</title>
+  <meta name="description" content="掷骰子 × LLM，生成一篇听起来很深刻但毫无意义的电影评论">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <h1>🎲 无意义影评生成器</h1>
+    <p>掷 6 颗骰子，让 AI 用学术黑话写一篇听起来很深刻但毫无意义的影评</p>
+  </header>
+
+  <main class="container">
+
+    <!-- Settings -->
+    <div class="settings-bar">
+      <button class="btn-icon" id="settings-toggle" title="API 设置">⚙️ API 设置</button>
+    </div>
+
+    <div class="settings-panel hidden" id="settings-panel">
+      <h3>🔑 LLM API 配置</h3>
+      <div class="form-group">
+        <label>API Key</label>
+        <input type="password" id="api-key" placeholder="sk-..." autocomplete="off">
+        <div class="settings-hint">Key 仅存储在浏览器，不会上传到任何服务器</div>
+      </div>
+      <div class="form-group">
+        <label>API 地址</label>
+        <input type="text" id="api-endpoint" placeholder="https://api.deepseek.com/v1/chat/completions">
+        <div class="settings-hint">
+          兼容 OpenAI 接口格式。推荐
+          <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">DeepSeek</a>（便宜）、
+          <a href="https://openai.com" target="_blank" rel="noopener">OpenAI</a>、
+          <a href="https://open.bigmodel.cn" target="_blank" rel="noopener">智谱</a> 等
+        </div>
+      </div>
+      <div class="form-group">
+        <label>模型名称</label>
+        <input type="text" id="api-model" placeholder="deepseek-chat">
+      </div>
+      <div class="settings-actions">
+        <button class="btn-primary" id="save-settings-btn">保存设置</button>
+        <span class="settings-status" id="settings-status">✓ 已保存</span>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="input-area">
+      <input type="text" id="film-input" placeholder="输入电影名称，例如：哪吒之魔童降世">
+      <button class="btn-roll" id="roll-btn" title="掷骰子">🎲 掷骰子</button>
+    </div>
+
+    <!-- Dice -->
+    <div class="dice-grid" id="dice-container"></div>
+    <div class="roll-summary" id="roll-summary"></div>
+
+    <!-- Generate -->
+    <div class="generate-bar">
+      <button class="btn-generate" id="generate-btn">🎬 生成影评</button>
+    </div>
+
+    <!-- Result -->
+    <div class="result-area hidden" id="result-area">
+      <div class="result-loading" id="result-loading">
+        <div class="spinner"></div>
+        <span>正在酝酿学术黑话…</span>
+      </div>
+      <div class="result-text" id="result-text"></div>
+      <div class="result-actions">
+        <button class="btn-sm" id="regenerate-btn">🔄 重新生成</button>
+        <button class="btn-sm" id="copy-btn">📋 复制</button>
+      </div>
+    </div>
+
+    <!-- History -->
+    <section class="history-section">
+      <h2>📜 历史记录</h2>
+      <div id="history-list"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    纯前端应用 · API Key 仅存储在浏览器 ·
+    <a href="https://github.com/JunkMonkey/meaningless-review" target="_blank" rel="noopener">GitHub</a>
+  </footer>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="js/dice-data.js"></script>
+  <script src="js/prompt.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
