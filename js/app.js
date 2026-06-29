@@ -31,6 +31,10 @@ const dom = {
   fetchModelsBtn:   $('#fetch-models-btn'),
   saveSettingsBtn:  $('#save-settings-btn'),
   settingsStatus:   $('#settings-status'),
+  plotSearchBtn:    $('#plot-search-btn'),
+  plotStatus:       $('#plot-status'),
+  plotArea:         $('#plot-area'),
+  plotSummary:      $('#plot-summary'),
   toast:            $('#toast'),
   diceFaces:        []
 };
@@ -219,6 +223,109 @@ async function fetchModels() {
     dom.fetchModelsBtn.disabled = false;
     dom.fetchModelsBtn.textContent = '📡 获取模型';
   }
+}
+
+// ── 搜索电影剧情（Wikipedia API）──────────────────────
+async function searchPlot() {
+  const filmName = dom.filmInput.value.trim();
+  if (!filmName) {
+    showToast('请先输入电影名称', 'warn');
+    dom.filmInput.focus();
+    return;
+  }
+
+  dom.plotSearchBtn.disabled = true;
+  dom.plotSearchBtn.textContent = '⏳ 搜索中…';
+  dom.plotStatus.textContent = '';
+  dom.plotArea.classList.add('hidden');
+
+  try {
+    // Search Wikipedia for the film (with 10s timeout)
+    const searchTerm = filmName + ' 电影';
+    const searchUrl = `https://zh.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(searchTerm)}&format=json&origin=*`;
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+    const searchResp = await fetch(searchUrl, { signal: ctrl.signal });
+    const searchData = await searchResp.json();
+    const pages = searchData.query?.search || [];
+
+    if (pages.length === 0) {
+      // Try English Wikipedia
+      const enSearchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(filmName + ' film')}&format=json&origin=*`;
+      const enResp = await fetch(enSearchUrl);
+      const enData = await enResp.json();
+      const enPages = enData.query?.search || [];
+
+      if (enPages.length === 0) {
+        // Fallback: try searching without "film" suffix
+        const bareUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(filmName)}&format=json&origin=*`;
+        const bareResp = await fetch(bareUrl);
+        const bareData = await bareResp.json();
+        const barePages = bareData.query?.search || [];
+
+        if (barePages.length === 0) {
+          dom.plotStatus.innerHTML = '⚠️ 未找到剧情，AI 将凭自身知识写作';
+          showToast('未找到剧情摘要', 'warn');
+          return;
+        }
+
+        // Continue with bare search results
+        await fetchExtract(barePages[0].title, 'en');
+        return;
+      }
+
+      await fetchExtract(enPages[0].title, 'en');
+      return;
+    }
+
+    await fetchExtract(pages[0].title, 'zh');
+
+  } catch (err) {
+    dom.plotStatus.textContent = '⚠️ 搜索失败，请手动填写或跳过';
+    showToast('搜索失败: ' + err.message, 'error');
+  } finally {
+    dom.plotSearchBtn.disabled = false;
+    dom.plotSearchBtn.textContent = '🔍 搜索剧情';
+  }
+}
+
+async function fetchExtract(title, lang) {
+  const apiBase = lang === 'zh'
+    ? 'https://zh.wikipedia.org/w/api.php'
+    : 'https://en.wikipedia.org/w/api.php';
+
+  const url = `${apiBase}?action=query&titles=${encodeURIComponent(title)}&prop=extracts&exintro=1&explaintext=1&format=json&origin=*`;
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 10000);
+  const resp = await fetch(url, { signal: ctrl.signal });
+  clearTimeout(timer);
+  const data = await resp.json();
+  const pages = data.query?.pages || {};
+  const page = Object.values(pages)[0];
+
+  if (!page || !page.extract) {
+    dom.plotStatus.textContent = '⚠️ 获取摘要失败';
+    return;
+  }
+
+  // Clean up the extract - remove reference markers and truncate
+  let extract = page.extract
+    .replace(/\[\d+\]/g, '')     // Remove [1], [2] etc.
+    .replace(/\([^)]*\b听\b[^)]*\)/g, '') // Remove "（点击阅读）" style links
+    .trim();
+
+  // Truncate to ~500 chars for a good summary
+  if (extract.length > 500) {
+    extract = extract.slice(0, 500).replace(/\.[^。]*$/, '。');
+  }
+
+  dom.plotSummary.value = extract;
+  dom.plotArea.classList.remove('hidden');
+  const flag = lang === 'zh' ? '🇨🇳' : '🇬🇧';
+  dom.plotStatus.textContent = `${flag} 已获取 Wikipedia 摘要（可手动修改）`;
+  showToast('剧情摘要获取成功 ✓');
 }
 
 // ── 历史记录 ──────────────────────────────────────────
@@ -416,9 +523,10 @@ async function generateReview() {
   dom.resultText.textContent = '';
 
   try {
+    const plotSummary = dom.plotSummary.value.trim();
     const text = await callLLM(
       buildSystemPrompt(),
-      buildUserPrompt(filmName, currentRoll)
+      buildUserPrompt(filmName, currentRoll, plotSummary)
     );
 
     dom.resultLoading.classList.add('hidden');
@@ -489,6 +597,9 @@ function bindEvents() {
 
   // 获取模型
   dom.fetchModelsBtn.addEventListener('click', fetchModels);
+
+  // 搜索剧情
+  dom.plotSearchBtn.addEventListener('click', searchPlot);
 
   // 关闭设置面板
   document.addEventListener('click', (e) => {

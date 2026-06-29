@@ -35,13 +35,21 @@ function buildSystemPrompt() {
 // 风格已经通过"你的局限"部分传达了。
 }
 
-function buildUserPrompt(filmName, rollResult) {
+function buildUserPrompt(filmName, rollResult, plotSummary) {
   const [d1, d2, d3, d4, d5, d6] = rollResult;
-  return `写一篇关于电影《${filmName}》的影评。
 
-用【${d1.face.text}】的理论语言来写。关注【${d2.face.text}】这个主题，从【${d3.face.text}】切入，把【${d4.face.text}】作为核心概念，放在【${d5.face.text}】的语境下。最终让读者意识到，这部电影真正指向的是【${d6.face.text}】。
+  let prompt = `写一篇关于电影《${filmName}》的影评。\n\n`;
+
+  // 如果有剧情摘要，先告诉 AI 电影讲什么
+  if (plotSummary) {
+    prompt += `【电影剧情】${plotSummary}\n\n`;
+  }
+
+  prompt += `用【${d1.face.text}】的理论语言来写。关注【${d2.face.text}】这个主题，从【${d3.face.text}】切入，把【${d4.face.text}】作为核心概念，放在【${d5.face.text}】的语境下。最终让读者意识到，这部电影真正指向的是【${d6.face.text}】。
 
 直接输出影评正文，不要标题、署名或任何前缀。`;
+
+  return prompt;
 }
 
 function buildRollSummary(rollResult) {
