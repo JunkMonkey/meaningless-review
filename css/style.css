@@ -209,49 +209,6 @@ body {
 .btn-roll:hover { border-color: var(--accent); background: var(--surface); }
 .btn-roll:active { transform: scale(.96); }
 
-/* ── Plot Summary ──────────────────────────────────── */
-.plot-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 18px;
-}
-.btn-plot-search {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: .85rem;
-  white-space: nowrap;
-  transition: all .2s;
-}
-.btn-plot-search:hover { color: var(--accent); border-color: var(--accent); }
-.btn-plot-search:disabled { opacity: .5; cursor: not-allowed; }
-
-.plot-status {
-  font-size: .78rem;
-  color: var(--text-dim);
-}
-
-.plot-area { margin-bottom: 18px; }
-.plot-area textarea {
-  width: 100%;
-  padding: 12px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-size: .9rem;
-  line-height: 1.7;
-  resize: vertical;
-  font-family: inherit;
-  transition: border-color .2s;
-}
-.plot-area textarea:focus { outline: none; border-color: var(--accent); }
-.plot-area textarea::placeholder { color: var(--text-dim); opacity: .4; }
-
 /* ── Dice Area ─────────────────────────────────────── */
 .dice-grid {
   display: flex;
@@ -508,11 +465,6 @@ body {
   .input-area { flex-direction: column; gap: 8px; margin-bottom: 16px; }
   .input-area input { padding: 12px 14px; font-size: .95rem; }
   .btn-roll { width: 100%; text-align: center; padding: 12px; font-size: 1rem; }
-
-  /* Plot */
-  .plot-bar { flex-direction: column; align-items: stretch; }
-  .btn-plot-search { text-align: center; }
-  .plot-area textarea { font-size: .85rem; padding: 12px; }
 
   /* Dice grid — 3 per row */
   .dice-grid { gap: 8px 6px; }

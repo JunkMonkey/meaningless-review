@@ -31,10 +31,6 @@ const dom = {
   fetchModelsBtn:   $('#fetch-models-btn'),
   saveSettingsBtn:  $('#save-settings-btn'),
   settingsStatus:   $('#settings-status'),
-  plotSearchBtn:    $('#plot-search-btn'),
-  plotStatus:       $('#plot-status'),
-  plotArea:         $('#plot-area'),
-  plotSummary:      $('#plot-summary'),
   toast:            $('#toast'),
   diceFaces:        []
 };
@@ -55,29 +51,18 @@ const API_PRESETS = {
   'https://api.anthropic.com/v1/messages':                          { format: 'anthropic', base: 'https://api.anthropic.com/v1' },
 };
 
-/**
- * Get the base URL for models endpoint from the chat endpoint
- */
 function getModelsEndpoint(endpoint, format) {
-  if (format === 'anthropic') {
-    return 'https://api.anthropic.com/v1/models';
-  }
-  // OpenAI-compatible: find base from presets or derive from endpoint
+  if (format === 'anthropic') return 'https://api.anthropic.com/v1/models';
   const preset = API_PRESETS[endpoint];
   if (preset) return preset.base + '/models';
-  // Custom endpoint: replace /chat/completions with /models
   return endpoint.replace(/\/chat\/completions\/?$/, '/models');
 }
 
-/**
- * Detect API format from endpoint URL
- */
 function detectFormat(endpoint) {
   if (endpoint.includes('anthropic')) return 'anthropic';
-  // Check against known presets
   const preset = API_PRESETS[endpoint];
   if (preset) return preset.format;
-  return 'openai'; // default
+  return 'openai';
 }
 
 // ── 初始化 ────────────────────────────────────────────
@@ -102,10 +87,9 @@ function loadSettings() {
 }
 
 function saveSettings() {
-  const endpoint = getCurrentEndpoint();
   const settings = {
     apiKey: dom.apiKey.value.trim(),
-    apiEndpoint: endpoint,
+    apiEndpoint: getCurrentEndpoint(),
     apiModel: dom.apiModel.value.trim() || 'deepseek-chat',
     apiFormat: apiFormat
   };
@@ -119,14 +103,11 @@ function getCurrentEndpoint() {
 // ── API 预设切换 ──────────────────────────────────────
 function applyPreset() {
   const val = dom.apiPreset.value;
-  if (!val) return; // placeholder option
+  if (!val) return;
   dom.apiEndpoint.value = val;
   const preset = API_PRESETS[val];
-  if (preset) {
-    apiFormat = preset.format;
-  } else {
-    apiFormat = detectFormat(val);
-  }
+  if (preset) { apiFormat = preset.format; }
+  else { apiFormat = detectFormat(val); }
 }
 
 function onEndpointChange() {
@@ -136,16 +117,9 @@ function onEndpointChange() {
 // ── 获取模型列表 ──────────────────────────────────────
 async function fetchModels() {
   const apiKey = dom.apiKey.value.trim();
-  if (!apiKey) {
-    showToast('请先填写 API Key', 'warn');
-    return;
-  }
-
+  if (!apiKey) { showToast('请先填写 API Key', 'warn'); return; }
   const endpoint = getCurrentEndpoint();
-  if (!endpoint) {
-    showToast('请先选择或填写 API 地址', 'warn');
-    return;
-  }
+  if (!endpoint) { showToast('请先选择或填写 API 地址', 'warn'); return; }
 
   const modelsUrl = getModelsEndpoint(endpoint, apiFormat);
   dom.fetchModelsBtn.disabled = true;
@@ -154,59 +128,35 @@ async function fetchModels() {
 
   try {
     let resp, data;
-
     if (apiFormat === 'anthropic') {
       resp = await fetch(modelsUrl, {
-        headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        }
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }
       });
     } else {
-      // OpenAI-compatible
       resp = await fetch(modelsUrl, {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`
-        }
+        headers: { 'Authorization': `Bearer ${apiKey}` }
       });
     }
 
     if (!resp.ok) {
       const errText = await resp.text().catch(() => '');
       let msg = `获取失败 (${resp.status})`;
-      try {
-        const j = JSON.parse(errText);
-        msg = j.error?.message || msg;
-      } catch (_) {}
+      try { const j = JSON.parse(errText); msg = j.error?.message || msg; } catch (_) {}
       throw new Error(msg);
     }
 
     data = await resp.json();
+    const models = (data.data || []).map(m => m.id);
+    if (models.length === 0) throw new Error('未找到可用模型');
 
-    // Extract model IDs
-    let models = [];
-    if (apiFormat === 'anthropic') {
-      // Anthropic: { data: [{ id: "claude-sonnet-4-20250514", ... }, ...] }
-      models = (data.data || []).map(m => m.id);
-    } else {
-      // OpenAI-compatible: { data: [{ id: "gpt-4o", ... }, ...] } or { object: "list", data: [...] }
-      models = (data.data || []).map(m => m.id);
-    }
-
-    if (models.length === 0) {
-      throw new Error('未找到可用模型');
-    }
-
-    // Populate select
-    dom.apiModelSelect.innerHTML = models.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+    dom.apiModelSelect.innerHTML = models.map(m =>
+      `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
     dom.apiModelSelect.classList.remove('hidden');
 
-    // Auto-select and sync
     dom.apiModelSelect.addEventListener('change', () => {
       dom.apiModel.value = dom.apiModelSelect.value;
     });
 
-    // If current model is in the list, select it
     const currentModel = dom.apiModel.value.trim();
     if (currentModel && models.includes(currentModel)) {
       dom.apiModelSelect.value = currentModel;
@@ -216,7 +166,6 @@ async function fetchModels() {
     }
 
     showToast(`找到 ${models.length} 个模型 ✓`);
-
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
@@ -225,114 +174,10 @@ async function fetchModels() {
   }
 }
 
-// ── 搜索电影剧情（Wikipedia API）──────────────────────
-async function searchPlot() {
-  const filmName = dom.filmInput.value.trim();
-  if (!filmName) {
-    showToast('请先输入电影名称', 'warn');
-    dom.filmInput.focus();
-    return;
-  }
-
-  dom.plotSearchBtn.disabled = true;
-  dom.plotSearchBtn.textContent = '⏳ 搜索中…';
-  dom.plotStatus.textContent = '';
-  dom.plotArea.classList.add('hidden');
-
-  try {
-    // Search Wikipedia for the film (with 10s timeout)
-    const searchTerm = filmName + ' 电影';
-    const searchUrl = `https://zh.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(searchTerm)}&format=json&origin=*`;
-
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 10000);
-    const searchResp = await fetch(searchUrl, { signal: ctrl.signal });
-    const searchData = await searchResp.json();
-    const pages = searchData.query?.search || [];
-
-    if (pages.length === 0) {
-      // Try English Wikipedia
-      const enSearchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(filmName + ' film')}&format=json&origin=*`;
-      const enResp = await fetch(enSearchUrl);
-      const enData = await enResp.json();
-      const enPages = enData.query?.search || [];
-
-      if (enPages.length === 0) {
-        // Fallback: try searching without "film" suffix
-        const bareUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(filmName)}&format=json&origin=*`;
-        const bareResp = await fetch(bareUrl);
-        const bareData = await bareResp.json();
-        const barePages = bareData.query?.search || [];
-
-        if (barePages.length === 0) {
-          dom.plotStatus.innerHTML = '⚠️ 未找到剧情，AI 将凭自身知识写作';
-          showToast('未找到剧情摘要', 'warn');
-          return;
-        }
-
-        // Continue with bare search results
-        await fetchExtract(barePages[0].title, 'en');
-        return;
-      }
-
-      await fetchExtract(enPages[0].title, 'en');
-      return;
-    }
-
-    await fetchExtract(pages[0].title, 'zh');
-
-  } catch (err) {
-    dom.plotStatus.textContent = '⚠️ 搜索失败，请手动填写或跳过';
-    showToast('搜索失败: ' + err.message, 'error');
-  } finally {
-    dom.plotSearchBtn.disabled = false;
-    dom.plotSearchBtn.textContent = '🔍 搜索剧情';
-  }
-}
-
-async function fetchExtract(title, lang) {
-  const apiBase = lang === 'zh'
-    ? 'https://zh.wikipedia.org/w/api.php'
-    : 'https://en.wikipedia.org/w/api.php';
-
-  const url = `${apiBase}?action=query&titles=${encodeURIComponent(title)}&prop=extracts&exintro=1&explaintext=1&format=json&origin=*`;
-
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 10000);
-  const resp = await fetch(url, { signal: ctrl.signal });
-  clearTimeout(timer);
-  const data = await resp.json();
-  const pages = data.query?.pages || {};
-  const page = Object.values(pages)[0];
-
-  if (!page || !page.extract) {
-    dom.plotStatus.textContent = '⚠️ 获取摘要失败';
-    return;
-  }
-
-  // Clean up the extract - remove reference markers and truncate
-  let extract = page.extract
-    .replace(/\[\d+\]/g, '')     // Remove [1], [2] etc.
-    .replace(/\([^)]*\b听\b[^)]*\)/g, '') // Remove "（点击阅读）" style links
-    .trim();
-
-  // Truncate to ~500 chars for a good summary
-  if (extract.length > 500) {
-    extract = extract.slice(0, 500).replace(/\.[^。]*$/, '。');
-  }
-
-  dom.plotSummary.value = extract;
-  dom.plotArea.classList.remove('hidden');
-  const flag = lang === 'zh' ? '🇨🇳' : '🇬🇧';
-  dom.plotStatus.textContent = `${flag} 已获取 Wikipedia 摘要（可手动修改）`;
-  showToast('剧情摘要获取成功 ✓');
-}
-
 // ── 历史记录 ──────────────────────────────────────────
 function loadHistory() {
-  try {
-    return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
-  } catch (_) { return []; }
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+  catch (_) { return []; }
 }
 
 function saveHistory(entry) {
@@ -414,7 +259,7 @@ function rollDice() {
 }
 
 // ── API 调用 ──────────────────────────────────────────
-async function callLLM(systemPrompt, userPrompt) {
+async function callLLM(systemPrompt, userPrompt, maxTokens = 600) {
   const apiKey = dom.apiKey.value.trim();
   const endpoint = getCurrentEndpoint();
   const model = dom.apiModel.value.trim();
@@ -424,19 +269,16 @@ async function callLLM(systemPrompt, userPrompt) {
   if (!model) throw new Error('请先填写模型名称');
 
   if (apiFormat === 'anthropic') {
-    return callAnthropic(apiKey, endpoint, model, systemPrompt, userPrompt);
+    return callAnthropic(apiKey, endpoint, model, systemPrompt, userPrompt, maxTokens);
   } else {
-    return callOpenAI(apiKey, endpoint, model, systemPrompt, userPrompt);
+    return callOpenAI(apiKey, endpoint, model, systemPrompt, userPrompt, maxTokens);
   }
 }
 
-async function callOpenAI(apiKey, endpoint, model, systemPrompt, userPrompt) {
+async function callOpenAI(apiKey, endpoint, model, systemPrompt, userPrompt, maxTokens) {
   const resp = await fetch(endpoint, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: model,
       messages: [
@@ -444,7 +286,7 @@ async function callOpenAI(apiKey, endpoint, model, systemPrompt, userPrompt) {
         { role: 'user', content: userPrompt }
       ],
       temperature: 0.9,
-      max_tokens: 600
+      max_tokens: maxTokens
     })
   });
 
@@ -461,21 +303,15 @@ async function callOpenAI(apiKey, endpoint, model, systemPrompt, userPrompt) {
   return content.trim();
 }
 
-async function callAnthropic(apiKey, endpoint, model, systemPrompt, userPrompt) {
+async function callAnthropic(apiKey, endpoint, model, systemPrompt, userPrompt, maxTokens) {
   const resp = await fetch(endpoint, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
       model: model,
       system: systemPrompt,
-      messages: [
-        { role: 'user', content: userPrompt }
-      ],
-      max_tokens: 600,
+      messages: [{ role: 'user', content: userPrompt }],
+      max_tokens: maxTokens,
       temperature: 0.9
     })
   });
@@ -493,7 +329,25 @@ async function callAnthropic(apiKey, endpoint, model, systemPrompt, userPrompt) 
   return text.trim();
 }
 
-// ── 生成影评 ──────────────────────────────────────────
+// ── 剧情回忆（用 LLM 自身知识当搜索引擎）──────────────
+async function recallPlot(filmName) {
+  try {
+    const result = await callLLM(
+      '你是一个电影数据库。只输出2-4句话的剧情概括，不要任何评论和分析。如果完全没听说过这部电影，只输出一个词：未知。',
+      `电影《${filmName}》讲的是什么故事？`,
+      150
+    );
+    const trimmed = result.trim();
+    if (trimmed === '未知' || trimmed.includes('没听说过') || trimmed.includes('不太清楚') || trimmed.includes('不了解')) {
+      return '';
+    }
+    return trimmed;
+  } catch (_) {
+    return '';
+  }
+}
+
+// ── 生成影评（两步：先回忆剧情，再写影评）─────────────
 async function generateReview() {
   if (isGenerating) return;
 
@@ -504,9 +358,7 @@ async function generateReview() {
     return;
   }
 
-  if (!currentRoll) {
-    rollDice();
-  }
+  if (!currentRoll) { rollDice(); }
 
   const apiKey = dom.apiKey.value.trim();
   if (!apiKey) {
@@ -517,16 +369,25 @@ async function generateReview() {
 
   isGenerating = true;
   dom.generateBtn.disabled = true;
-  dom.generateBtn.textContent = '⏳ 生成中...';
   dom.resultArea.classList.remove('hidden');
-  dom.resultLoading.classList.remove('hidden');
   dom.resultText.textContent = '';
 
+  // Step 1: 回忆剧情
+  dom.resultLoading.classList.remove('hidden');
+  dom.resultLoading.querySelector('span').textContent = '正在回忆电影剧情…';
+  dom.generateBtn.textContent = '⏳ 回忆剧情…';
+
+  const plotSummary = await recallPlot(filmName);
+
+  // Step 2: 生成影评
+  dom.resultLoading.querySelector('span').textContent = '正在撰写学术黑话…';
+  dom.generateBtn.textContent = '⏳ 撰写中…';
+
   try {
-    const plotSummary = dom.plotSummary.value.trim();
     const text = await callLLM(
       buildSystemPrompt(),
-      buildUserPrompt(filmName, currentRoll, plotSummary)
+      buildUserPrompt(filmName, currentRoll, plotSummary),
+      800
     );
 
     dom.resultLoading.classList.add('hidden');
@@ -576,13 +437,11 @@ function bindEvents() {
     }).catch(() => showToast('复制失败，请手动选中复制'));
   });
 
-  // 设置面板
   dom.settingsToggle.addEventListener('click', () => {
     dom.settingsPanel.classList.toggle('hidden');
   });
 
   dom.apiPreset.addEventListener('change', applyPreset);
-
   dom.apiEndpoint.addEventListener('input', onEndpointChange);
 
   dom.saveSettingsBtn.addEventListener('click', () => {
@@ -595,13 +454,8 @@ function bindEvents() {
     }, 1200);
   });
 
-  // 获取模型
   dom.fetchModelsBtn.addEventListener('click', fetchModels);
 
-  // 搜索剧情
-  dom.plotSearchBtn.addEventListener('click', searchPlot);
-
-  // 关闭设置面板
   document.addEventListener('click', (e) => {
     if (!dom.settingsPanel.classList.contains('hidden') &&
         !dom.settingsPanel.contains(e.target) &&
@@ -617,9 +471,7 @@ function showToast(msg, type = '') {
   dom.toast.className = 'toast ' + type;
   dom.toast.classList.add('visible');
   clearTimeout(dom.toast._timeout);
-  dom.toast._timeout = setTimeout(() => {
-    dom.toast.classList.remove('visible');
-  }, 2500);
+  dom.toast._timeout = setTimeout(() => dom.toast.classList.remove('visible'), 2500);
 }
 
 function escapeHtml(str) {
