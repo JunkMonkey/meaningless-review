@@ -26,7 +26,6 @@ const dom = {
   apiKey:           $('#api-key'),
   apiPreset:        $('#api-preset'),
   apiEndpoint:      $('#api-endpoint'),
-  customGroup:      $('#custom-endpoint-group'),
   apiModel:         $('#api-model'),
   apiModelSelect:   $('#api-model-select'),
   fetchModelsBtn:   $('#fetch-models-btn'),
@@ -83,8 +82,6 @@ function init() {
   renderHistory();
   renderDice();
   bindEvents();
-  // Initially show/hide custom endpoint field
-  updateEndpointUI();
 }
 
 // ── 配置读写 ──────────────────────────────────────────
@@ -94,15 +91,7 @@ function loadSettings() {
     if (saved) {
       dom.apiKey.value = saved.apiKey || '';
       apiFormat = saved.apiFormat || 'openai';
-
-      const endpoint = saved.apiEndpoint || 'https://api.deepseek.com/v1/chat/completions';
-      // Try to match a preset
-      if (API_PRESETS[endpoint]) {
-        dom.apiPreset.value = endpoint;
-      } else {
-        dom.apiPreset.value = '__custom__';
-      }
-      dom.apiEndpoint.value = endpoint;
+      dom.apiEndpoint.value = saved.apiEndpoint || 'https://api.deepseek.com/v1/chat/completions';
       dom.apiModel.value = saved.apiModel || 'deepseek-chat';
     }
   } catch (_) { /* ignore */ }
@@ -120,28 +109,24 @@ function saveSettings() {
 }
 
 function getCurrentEndpoint() {
-  if (dom.apiPreset.value === '__custom__' || dom.apiPreset.value === '') {
-    return dom.apiEndpoint.value.trim();
-  }
-  return dom.apiPreset.value;
+  return dom.apiEndpoint.value.trim();
 }
 
 // ── API 预设切换 ──────────────────────────────────────
-function updateEndpointUI() {
+function applyPreset() {
   const val = dom.apiPreset.value;
-  if (val === '__custom__') {
-    dom.customGroup.classList.remove('hidden');
-    apiFormat = detectFormat(dom.apiEndpoint.value.trim());
-  } else if (val === '') {
-    dom.customGroup.classList.remove('hidden');
+  if (!val) return; // placeholder option
+  dom.apiEndpoint.value = val;
+  const preset = API_PRESETS[val];
+  if (preset) {
+    apiFormat = preset.format;
   } else {
-    dom.customGroup.classList.add('hidden');
-    const preset = API_PRESETS[val];
-    if (preset) {
-      apiFormat = preset.format;
-      dom.apiEndpoint.value = val;
-    }
+    apiFormat = detectFormat(val);
   }
+}
+
+function onEndpointChange() {
+  apiFormat = detectFormat(dom.apiEndpoint.value.trim());
 }
 
 // ── 获取模型列表 ──────────────────────────────────────
@@ -488,7 +473,9 @@ function bindEvents() {
     dom.settingsPanel.classList.toggle('hidden');
   });
 
-  dom.apiPreset.addEventListener('change', updateEndpointUI);
+  dom.apiPreset.addEventListener('change', applyPreset);
+
+  dom.apiEndpoint.addEventListener('input', onEndpointChange);
 
   dom.saveSettingsBtn.addEventListener('click', () => {
     saveSettings();

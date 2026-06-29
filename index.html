@@ -31,28 +31,22 @@
         <div class="settings-hint">Key 仅存储在浏览器，不会上传到任何服务器</div>
       </div>
       <div class="form-group">
-        <label>API 接口</label>
-        <select id="api-preset">
-          <option value="">— 选择常用接口 —</option>
+        <label>API 地址</label>
+        <input type="text" id="api-endpoint" placeholder="https://api.deepseek.com/v1/chat/completions">
+        <select id="api-preset" class="preset-select">
+          <option value="">📋 快速填入常用接口…</option>
           <optgroup label="OpenAI 兼容格式">
-            <option value="https://api.deepseek.com/v1/chat/completions">DeepSeek — api.deepseek.com</option>
-            <option value="https://api.openai.com/v1/chat/completions">OpenAI — api.openai.com</option>
-            <option value="https://open.bigmodel.cn/api/paas/v4/chat/completions">智谱 GLM — open.bigmodel.cn</option>
-            <option value="https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions">通义千问 — dashscope.aliyuncs.com</option>
-            <option value="https://api.moonshot.cn/v1/chat/completions">Moonshot — api.moonshot.cn</option>
-            <option value="https://api.siliconflow.cn/v1/chat/completions">SiliconFlow — api.siliconflow.cn</option>
+            <option value="https://api.deepseek.com/v1/chat/completions">DeepSeek</option>
+            <option value="https://api.openai.com/v1/chat/completions">OpenAI</option>
+            <option value="https://open.bigmodel.cn/api/paas/v4/chat/completions">智谱 GLM</option>
+            <option value="https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions">通义千问</option>
+            <option value="https://api.moonshot.cn/v1/chat/completions">Moonshot</option>
+            <option value="https://api.siliconflow.cn/v1/chat/completions">SiliconFlow</option>
           </optgroup>
           <optgroup label="Anthropic Claude 格式">
-            <option value="https://api.anthropic.com/v1/messages">Anthropic Claude — api.anthropic.com</option>
-          </optgroup>
-          <optgroup label="其他">
-            <option value="__custom__">自定义地址…</option>
+            <option value="https://api.anthropic.com/v1/messages">Anthropic Claude</option>
           </optgroup>
         </select>
-      </div>
-      <div class="form-group" id="custom-endpoint-group">
-        <label>自定义 API 地址</label>
-        <input type="text" id="api-endpoint" placeholder="https://api.deepseek.com/v1/chat/completions">
       </div>
       <div class="form-group">
         <label>模型名称</label>

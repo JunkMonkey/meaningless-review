@@ -132,6 +132,16 @@ body {
 .settings-status.visible { opacity: 1; }
 
 /* ── API Preset & Model Row ───────────────────────── */
+.preset-select {
+  margin-top: 6px;
+  font-size: .82rem;
+  padding: 6px 10px;
+  color: var(--text-dim);
+}
+.preset-select optgroup {
+  font-weight: 600;
+  color: var(--text-dim);
+}
 .model-row {
   display: flex;
   gap: 8px;
