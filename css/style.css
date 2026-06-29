@@ -92,7 +92,8 @@ body {
   color: var(--text-dim);
   margin-bottom: 4px;
 }
-.form-group input {
+.form-group input,
+.form-group select {
   width: 100%;
   padding: 10px 14px;
   background: var(--bg);
@@ -102,11 +103,14 @@ body {
   font-size: .9rem;
   transition: border-color .2s;
 }
-.form-group input:focus {
+.form-group input:focus,
+.form-group select:focus {
   outline: none;
   border-color: var(--accent);
 }
 .form-group input::placeholder { color: var(--text-dim); opacity: .5; }
+.form-group select option { background: var(--surface); color: var(--text); }
+.form-group select optgroup { color: var(--text-dim); font-style: normal; }
 .settings-hint {
   font-size: .78rem;
   color: var(--text-dim);
@@ -126,6 +130,27 @@ body {
   transition: opacity .2s;
 }
 .settings-status.visible { opacity: 1; }
+
+/* ── API Preset & Model Row ───────────────────────── */
+.model-row {
+  display: flex;
+  gap: 8px;
+}
+.model-row .model-input {
+  flex: 1;
+}
+.btn-fetch {
+  white-space: nowrap;
+  font-size: .8rem;
+  padding: 8px 14px;
+}
+.btn-fetch:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.model-select {
+  margin-top: 8px;
+}
 
 .btn-primary {
   background: linear-gradient(135deg, var(--accent), #a78bfa);

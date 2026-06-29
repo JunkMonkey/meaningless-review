@@ -8,7 +8,6 @@ const HISTORY_KEY = 'meaningless_review_history';
 
 // ── DOM 引用 ──────────────────────────────────────────
 const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => document.querySelectorAll(sel);
 
 const dom = {
   filmInput:        $('#film-input'),
@@ -25,26 +24,67 @@ const dom = {
   settingsToggle:   $('#settings-toggle'),
   settingsPanel:    $('#settings-panel'),
   apiKey:           $('#api-key'),
+  apiPreset:        $('#api-preset'),
   apiEndpoint:      $('#api-endpoint'),
+  customGroup:      $('#custom-endpoint-group'),
   apiModel:         $('#api-model'),
+  apiModelSelect:   $('#api-model-select'),
+  fetchModelsBtn:   $('#fetch-models-btn'),
   saveSettingsBtn:  $('#save-settings-btn'),
   settingsStatus:   $('#settings-status'),
   toast:            $('#toast'),
-
-  // 单个骰子面的 DOM 会动态创建
-  diceFaces: []  // 由 renderDice 填充
+  diceFaces:        []
 };
 
 // ── 状态 ──────────────────────────────────────────────
-let currentRoll = null;        // 当前掷骰结果
+let currentRoll = null;
 let isGenerating = false;
+let apiFormat = 'openai';  // 'openai' or 'anthropic'
+
+// ── 预设 API 列表 ─────────────────────────────────────
+const API_PRESETS = {
+  'https://api.deepseek.com/v1/chat/completions':                   { format: 'openai',    base: 'https://api.deepseek.com/v1' },
+  'https://api.openai.com/v1/chat/completions':                     { format: 'openai',    base: 'https://api.openai.com/v1' },
+  'https://open.bigmodel.cn/api/paas/v4/chat/completions':          { format: 'openai',    base: 'https://open.bigmodel.cn/api/paas/v4' },
+  'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions': { format: 'openai', base: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+  'https://api.moonshot.cn/v1/chat/completions':                    { format: 'openai',    base: 'https://api.moonshot.cn/v1' },
+  'https://api.siliconflow.cn/v1/chat/completions':                 { format: 'openai',    base: 'https://api.siliconflow.cn/v1' },
+  'https://api.anthropic.com/v1/messages':                          { format: 'anthropic', base: 'https://api.anthropic.com/v1' },
+};
+
+/**
+ * Get the base URL for models endpoint from the chat endpoint
+ */
+function getModelsEndpoint(endpoint, format) {
+  if (format === 'anthropic') {
+    return 'https://api.anthropic.com/v1/models';
+  }
+  // OpenAI-compatible: find base from presets or derive from endpoint
+  const preset = API_PRESETS[endpoint];
+  if (preset) return preset.base + '/models';
+  // Custom endpoint: replace /chat/completions with /models
+  return endpoint.replace(/\/chat\/completions\/?$/, '/models');
+}
+
+/**
+ * Detect API format from endpoint URL
+ */
+function detectFormat(endpoint) {
+  if (endpoint.includes('anthropic')) return 'anthropic';
+  // Check against known presets
+  const preset = API_PRESETS[endpoint];
+  if (preset) return preset.format;
+  return 'openai'; // default
+}
 
 // ── 初始化 ────────────────────────────────────────────
 function init() {
   loadSettings();
-  loadHistory();
+  renderHistory();
   renderDice();
   bindEvents();
+  // Initially show/hide custom endpoint field
+  updateEndpointUI();
 }
 
 // ── 配置读写 ──────────────────────────────────────────
@@ -53,19 +93,147 @@ function loadSettings() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (saved) {
       dom.apiKey.value = saved.apiKey || '';
-      dom.apiEndpoint.value = saved.apiEndpoint || 'https://api.deepseek.com/v1/chat/completions';
+      apiFormat = saved.apiFormat || 'openai';
+
+      const endpoint = saved.apiEndpoint || 'https://api.deepseek.com/v1/chat/completions';
+      // Try to match a preset
+      if (API_PRESETS[endpoint]) {
+        dom.apiPreset.value = endpoint;
+      } else {
+        dom.apiPreset.value = '__custom__';
+      }
+      dom.apiEndpoint.value = endpoint;
       dom.apiModel.value = saved.apiModel || 'deepseek-chat';
     }
   } catch (_) { /* ignore */ }
 }
 
 function saveSettings() {
+  const endpoint = getCurrentEndpoint();
   const settings = {
     apiKey: dom.apiKey.value.trim(),
-    apiEndpoint: dom.apiEndpoint.value.trim() || 'https://api.deepseek.com/v1/chat/completions',
-    apiModel: dom.apiModel.value.trim() || 'deepseek-chat'
+    apiEndpoint: endpoint,
+    apiModel: dom.apiModel.value.trim() || 'deepseek-chat',
+    apiFormat: apiFormat
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+}
+
+function getCurrentEndpoint() {
+  if (dom.apiPreset.value === '__custom__' || dom.apiPreset.value === '') {
+    return dom.apiEndpoint.value.trim();
+  }
+  return dom.apiPreset.value;
+}
+
+// ── API 预设切换 ──────────────────────────────────────
+function updateEndpointUI() {
+  const val = dom.apiPreset.value;
+  if (val === '__custom__') {
+    dom.customGroup.classList.remove('hidden');
+    apiFormat = detectFormat(dom.apiEndpoint.value.trim());
+  } else if (val === '') {
+    dom.customGroup.classList.remove('hidden');
+  } else {
+    dom.customGroup.classList.add('hidden');
+    const preset = API_PRESETS[val];
+    if (preset) {
+      apiFormat = preset.format;
+      dom.apiEndpoint.value = val;
+    }
+  }
+}
+
+// ── 获取模型列表 ──────────────────────────────────────
+async function fetchModels() {
+  const apiKey = dom.apiKey.value.trim();
+  if (!apiKey) {
+    showToast('请先填写 API Key', 'warn');
+    return;
+  }
+
+  const endpoint = getCurrentEndpoint();
+  if (!endpoint) {
+    showToast('请先选择或填写 API 地址', 'warn');
+    return;
+  }
+
+  const modelsUrl = getModelsEndpoint(endpoint, apiFormat);
+  dom.fetchModelsBtn.disabled = true;
+  dom.fetchModelsBtn.textContent = '⏳ 获取中…';
+  dom.apiModelSelect.classList.add('hidden');
+
+  try {
+    let resp, data;
+
+    if (apiFormat === 'anthropic') {
+      resp = await fetch(modelsUrl, {
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        }
+      });
+    } else {
+      // OpenAI-compatible
+      resp = await fetch(modelsUrl, {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`
+        }
+      });
+    }
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => '');
+      let msg = `获取失败 (${resp.status})`;
+      try {
+        const j = JSON.parse(errText);
+        msg = j.error?.message || msg;
+      } catch (_) {}
+      throw new Error(msg);
+    }
+
+    data = await resp.json();
+
+    // Extract model IDs
+    let models = [];
+    if (apiFormat === 'anthropic') {
+      // Anthropic: { data: [{ id: "claude-sonnet-4-20250514", ... }, ...] }
+      models = (data.data || []).map(m => m.id);
+    } else {
+      // OpenAI-compatible: { data: [{ id: "gpt-4o", ... }, ...] } or { object: "list", data: [...] }
+      models = (data.data || []).map(m => m.id);
+    }
+
+    if (models.length === 0) {
+      throw new Error('未找到可用模型');
+    }
+
+    // Populate select
+    dom.apiModelSelect.innerHTML = models.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+    dom.apiModelSelect.classList.remove('hidden');
+
+    // Auto-select and sync
+    dom.apiModelSelect.addEventListener('change', () => {
+      dom.apiModel.value = dom.apiModelSelect.value;
+    });
+
+    // If current model is in the list, select it
+    const currentModel = dom.apiModel.value.trim();
+    if (currentModel && models.includes(currentModel)) {
+      dom.apiModelSelect.value = currentModel;
+    } else if (models.length > 0) {
+      dom.apiModelSelect.value = models[0];
+      dom.apiModel.value = models[0];
+    }
+
+    showToast(`找到 ${models.length} 个模型 ✓`);
+
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    dom.fetchModelsBtn.disabled = false;
+    dom.fetchModelsBtn.textContent = '📡 获取模型';
+  }
 }
 
 // ── 历史记录 ──────────────────────────────────────────
@@ -78,7 +246,6 @@ function loadHistory() {
 function saveHistory(entry) {
   const history = loadHistory();
   history.unshift(entry);
-  // 最多保留 50 条
   if (history.length > 50) history.length = 50;
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
 }
@@ -100,7 +267,6 @@ function renderHistory() {
     </div>
   `).join('');
 
-  // 点击历史记录回看
   dom.historyList.querySelectorAll('.history-item').forEach(el => {
     el.addEventListener('click', () => {
       const idx = parseInt(el.dataset.index);
@@ -138,8 +304,6 @@ function renderDiceResult(rollResult) {
     const df = dom.diceFaces[i];
     df.face.textContent = r.face.emoji;
     df.current.innerHTML = `<span class="dice-word">${r.face.text}</span>`;
-
-    // 触发一个小动画：骰子闪一下
     df.cube.classList.add('dice-rolled');
     setTimeout(() => df.cube.classList.remove('dice-rolled'), 400);
   });
@@ -149,27 +313,32 @@ function renderDiceResult(rollResult) {
 function rollDice() {
   currentRoll = rollAllDice();
   renderDiceResult(currentRoll);
-
   const summary = buildRollSummary(currentRoll);
   dom.rollSummary.textContent = summary;
   dom.rollSummary.classList.add('pop');
-
-  // 隐藏上次的结果
   dom.resultArea.classList.add('hidden');
   dom.resultText.textContent = '';
-
   setTimeout(() => dom.rollSummary.classList.remove('pop'), 400);
 }
 
 // ── API 调用 ──────────────────────────────────────────
-async function callLLM(messages) {
+async function callLLM(systemPrompt, userPrompt) {
   const apiKey = dom.apiKey.value.trim();
-  const endpoint = dom.apiEndpoint.value.trim();
+  const endpoint = getCurrentEndpoint();
   const model = dom.apiModel.value.trim();
 
   if (!apiKey) throw new Error('请先配置 API Key');
   if (!endpoint) throw new Error('请先配置 API 地址');
+  if (!model) throw new Error('请先填写模型名称');
 
+  if (apiFormat === 'anthropic') {
+    return callAnthropic(apiKey, endpoint, model, systemPrompt, userPrompt);
+  } else {
+    return callOpenAI(apiKey, endpoint, model, systemPrompt, userPrompt);
+  }
+}
+
+async function callOpenAI(apiKey, endpoint, model, systemPrompt, userPrompt) {
   const resp = await fetch(endpoint, {
     method: 'POST',
     headers: {
@@ -178,7 +347,10 @@ async function callLLM(messages) {
     },
     body: JSON.stringify({
       model: model,
-      messages: messages,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
       temperature: 0.9,
       max_tokens: 600
     })
@@ -187,10 +359,7 @@ async function callLLM(messages) {
   if (!resp.ok) {
     const errBody = await resp.text().catch(() => '');
     let msg = `API 错误 (${resp.status})`;
-    try {
-      const j = JSON.parse(errBody);
-      msg = j.error?.message || msg;
-    } catch (_) { /* use default */ }
+    try { const j = JSON.parse(errBody); msg = j.error?.message || msg; } catch (_) {}
     throw new Error(msg);
   }
 
@@ -198,6 +367,38 @@ async function callLLM(messages) {
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('API 返回内容为空');
   return content.trim();
+}
+
+async function callAnthropic(apiKey, endpoint, model, systemPrompt, userPrompt) {
+  const resp = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: model,
+      system: systemPrompt,
+      messages: [
+        { role: 'user', content: userPrompt }
+      ],
+      max_tokens: 600,
+      temperature: 0.9
+    })
+  });
+
+  if (!resp.ok) {
+    const errBody = await resp.text().catch(() => '');
+    let msg = `Claude API 错误 (${resp.status})`;
+    try { const j = JSON.parse(errBody); msg = j.error?.message || msg; } catch (_) {}
+    throw new Error(msg);
+  }
+
+  const data = await resp.json();
+  const text = data.content?.[0]?.text;
+  if (!text) throw new Error('Claude 返回内容为空');
+  return text.trim();
 }
 
 // ── 生成影评 ──────────────────────────────────────────
@@ -212,14 +413,13 @@ async function generateReview() {
   }
 
   if (!currentRoll) {
-    // 还没掷骰子，先掷
     rollDice();
   }
 
   const apiKey = dom.apiKey.value.trim();
   if (!apiKey) {
     showToast('请先配置 API Key（点击右上角设置）', 'warn');
-    dom.settingsToggle.click();
+    dom.settingsPanel.classList.remove('hidden');
     return;
   }
 
@@ -231,17 +431,14 @@ async function generateReview() {
   dom.resultText.textContent = '';
 
   try {
-    const messages = [
-      { role: 'system', content: buildSystemPrompt() },
-      { role: 'user', content: buildUserPrompt(filmName, currentRoll) }
-    ];
-
-    const text = await callLLM(messages);
+    const text = await callLLM(
+      buildSystemPrompt(),
+      buildUserPrompt(filmName, currentRoll)
+    );
 
     dom.resultLoading.classList.add('hidden');
     dom.resultText.textContent = text;
 
-    // 保存到历史
     const now = new Date();
     const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
     saveHistory({
@@ -252,7 +449,6 @@ async function generateReview() {
       time: timeStr
     });
     renderHistory();
-
     showToast('影评生成完成 ✨');
   } catch (err) {
     dom.resultLoading.classList.add('hidden');
@@ -267,13 +463,9 @@ async function generateReview() {
 
 // ── 事件绑定 ──────────────────────────────────────────
 function bindEvents() {
-  // 掷骰子
   dom.rollBtn.addEventListener('click', rollDice);
-
-  // 生成影评
   dom.generateBtn.addEventListener('click', generateReview);
 
-  // Enter 键生成
   dom.filmInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -281,24 +473,22 @@ function bindEvents() {
     }
   });
 
-  // 重新生成（用当前掷骰结果再调一次 API）
   dom.regenerateBtn.addEventListener('click', generateReview);
 
-  // 复制
   dom.copyBtn.addEventListener('click', () => {
     const text = dom.resultText.textContent;
     if (!text) return;
     navigator.clipboard.writeText(text).then(() => {
       showToast('已复制到剪贴板 📋');
-    }).catch(() => {
-      showToast('复制失败，请手动选中复制');
-    });
+    }).catch(() => showToast('复制失败，请手动选中复制'));
   });
 
   // 设置面板
   dom.settingsToggle.addEventListener('click', () => {
     dom.settingsPanel.classList.toggle('hidden');
   });
+
+  dom.apiPreset.addEventListener('change', updateEndpointUI);
 
   dom.saveSettingsBtn.addEventListener('click', () => {
     saveSettings();
@@ -310,7 +500,10 @@ function bindEvents() {
     }, 1200);
   });
 
-  // 点击其他地方关闭设置面板
+  // 获取模型
+  dom.fetchModelsBtn.addEventListener('click', fetchModels);
+
+  // 关闭设置面板
   document.addEventListener('click', (e) => {
     if (!dom.settingsPanel.classList.contains('hidden') &&
         !dom.settingsPanel.contains(e.target) &&
