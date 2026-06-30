@@ -1,9 +1,7 @@
 /**
  * 骰子词库 — 6 组关键词，每组 6 面
- * 词条全部重新设计，与公众号原文无重叠
  */
 const DICE_DATA = [
-  // 骰子 1：理论大师 — 哲学家名字无版权问题，保留但微调
   {
     label: '理论视角',
     faces: [
@@ -12,67 +10,62 @@ const DICE_DATA = [
       { text: '拉康',     emoji: '🪞' },
       { text: '福柯',     emoji: '👁️' },
       { text: '德勒兹',   emoji: '🌊' },
-      { text: '鲍德里亚', emoji: '📺' }
+      { text: '巴特',     emoji: '✍️' }
     ]
   },
-  // 骰子 2：核心议题 — 全部替换
   {
     label: '核心议题',
     faces: [
-      { text: '焦虑', emoji: '😰' },
-      { text: '享乐', emoji: '🍷' },
-      { text: '幻象', emoji: '🫧' },
-      { text: '对抗', emoji: '⚔️' },
-      { text: '轮回', emoji: '🔁' },
-      { text: '承认', emoji: '🤝' }
+      { text: '欲望', emoji: '🔥' },
+      { text: '创伤', emoji: '💔' },
+      { text: '记忆', emoji: '🎞️' },
+      { text: '身份', emoji: '🎭' },
+      { text: '权力', emoji: '⚡' },
+      { text: '异化', emoji: '🏭' }
     ]
   },
-  // 骰子 3：分析入口 — 全部替换
   {
-    label: '分析入口',
+    label: '分析对象',
     faces: [
-      { text: '媒介', emoji: '📡' },
-      { text: '仪式', emoji: '🎪' },
-      { text: '边界', emoji: '🚧' },
-      { text: '声音', emoji: '🎤' },
-      { text: '交换', emoji: '💱' },
-      { text: '禁忌', emoji: '🚫' }
+      { text: '身体', emoji: '🧬' },
+      { text: '家庭', emoji: '🏠' },
+      { text: '空间', emoji: '🗺️' },
+      { text: '时间', emoji: '⏳' },
+      { text: '消费', emoji: '🛒' },
+      { text: '语言', emoji: '💬' }
     ]
   },
-  // 骰子 4：理论概念 — 全部替换
   {
-    label: '理论概念',
+    label: '高级名词',
     faces: [
-      { text: '延异', emoji: '🔀' },
-      { text: '褶子', emoji: '📐' },
-      { text: '征兆', emoji: '🩺' },
-      { text: '升华', emoji: '🕊️' },
-      { text: '镜像', emoji: '🪞' },
-      { text: '淫秽', emoji: '🫣' }
+      { text: '他者',     emoji: '👤' },
+      { text: '凝视',     emoji: '👀' },
+      { text: '缺席',     emoji: '🕳️' },
+      { text: '能指/所指', emoji: '🏷️' },
+      { text: '规训',     emoji: '🏛️' },
+      { text: '主体',     emoji: '🧍' }
     ]
   },
-  // 骰子 5：时代语境 — 全部替换
   {
-    label: '时代语境',
+    label: '格局打开',
     faces: [
-      { text: '加速主义',     emoji: '⏩' },
-      { text: '平台资本主义', emoji: '🖥️' },
-      { text: '监控社会',     emoji: '📹' },
-      { text: '液态现代性',   emoji: '💧' },
-      { text: '人类世',       emoji: '🌍' },
-      { text: '算法治理',     emoji: '🤖' }
+      { text: '现代性',   emoji: '🏗️' },
+      { text: '后现代性', emoji: '🎨' },
+      { text: '消费社会', emoji: '🛍️' },
+      { text: '资本主义', emoji: '💰' },
+      { text: '数字时代', emoji: '💻' },
+      { text: '景观社会', emoji: '📸' }
     ]
   },
-  // 骰子 6：终极结论 — 全部替换
   {
-    label: '终极结论',
+    label: '给出结论',
     faces: [
-      { text: '欲望的无限延宕',   emoji: '🔁' },
-      { text: '主体是一个空位',   emoji: '🕳️' },
-      { text: '真实界总在刺入',   emoji: '💥' },
-      { text: '大他者并不存在',   emoji: '🃏' },
-      { text: '剩余快感的循环',   emoji: '🌀' },
-      { text: '能指链条的滑脱',   emoji: '⛓️' }
+      { text: '主体性的瓦解',     emoji: '💀' },
+      { text: '身份认同危机',     emoji: '🎭' },
+      { text: '归属感消失',       emoji: '🏚️' },
+      { text: '现实边界模糊',     emoji: '🌫️' },
+      { text: '日常经验陌异化',   emoji: '🪟' },
+      { text: '意义系统崩塌',     emoji: '⛓️' }
     ]
   }
 ];
